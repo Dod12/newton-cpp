@@ -1,9 +1,0 @@
-# ninja log v5
-13	6627	1653128343417502973	CMakeFiles/Newton.dir/src/main.cpp.o	7c05f1d3dc005e88
-6628	6860	1653128343670489059	Newton	d381679a51d75586
-1	6867	1653129355660123912	CMakeFiles/py_newton.dir/src/Fractal.cpp.o	ba08037afc6e7a26
-8	7863	1653129659744677600	CMakeFiles/py_newton.dir/src/main.cpp.o	201bf12acf4397c4
-7	6704	1653128322277333132	CMakeFiles/Newton.dir/src/Fractal.cpp.o	9f2d1c566451ebff
-7863	8025	1653129659938429259	py_newton.cpython-39-darwin.so	7b7c291936260ec2
-5	7679	1653129905762976340	CMakeFiles/py_newton.dir/src/py_newton.cpp.o	50448dbb5902d2ee
-7680	7849	1653129905955432491	py_newton.cpython-39-darwin.so	c83e89d97f2f465

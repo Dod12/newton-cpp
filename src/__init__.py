@@ -1,2 +1,0 @@
-from setup_mesh import setup_mesh
-import py_newton

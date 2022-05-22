@@ -15,9 +15,9 @@ MatrixXd Fractal::estimate_jacobian(const VectorXd& x_0) {
     MatrixXd j = MatrixXd::Zero(x_size, x_size);
 
     for (int i = 0; i < x_size; i++){
-        VectorXd h = VectorXd::Zero(x_size);
-        h(i) = 1e-5;
-        VectorXd tmp = x_0 + h;
+        VectorXd h_vec = VectorXd::Zero(x_size);
+        h_vec(i) = (double) this->h;
+        VectorXd tmp = x_0 + h_vec;
         j(all, i) = this->function(tmp);
     }
 
@@ -28,9 +28,8 @@ VectorXd Fractal::newtons_method(VectorXd x) {
 
     MatrixXd j;
     int i = 0;
-    int max_iter = 10000;
 
-    while (1e-20 < this->function(x).norm() && i < max_iter) {
+    while (this->estimation_eps < this->function(x).norm() && i < this->max_iter) {
         if (this->hasJacobian) {
             j = this->jacobian(x);
         } else {
@@ -44,33 +43,77 @@ VectorXd Fractal::newtons_method(VectorXd x) {
     return x;
 }
 
-Fractal::Fractal(VectorXd (*function)(VectorXd &)) {
+Fractal::Fractal(VectorXd (*function)(VectorXd &), long double h, uint max_iter,
+                 long double comparison_eps, long double estimation_eps) {
+    this->comparison_eps = comparison_eps;
+    this->estimation_eps = estimation_eps;
+    this->h = h;
+    this->max_iter = max_iter;
     this->function = function;
     this->hasJacobian = false;
 }
 
-Fractal::Fractal(VectorXd (*function)(VectorXd &),
-                 MatrixXd (*jacobian)(VectorXd &)) {
+Fractal::Fractal(VectorXd (*function)(VectorXd &), MatrixXd (*jacobian)(VectorXd &), long double h,
+                 uint max_iter, long double comparison_eps, long double estimation_eps) {
+    this->comparison_eps = comparison_eps;
+    this->estimation_eps = estimation_eps;
+    this->h = h;
+    this->max_iter = max_iter;
     this->function = function;
     this->jacobian = jacobian;
     this->hasJacobian = true;
 }
 
-Tensor<double, 3, RowMajor> Fractal::newton_grid(Tensor<double, 3, RowMajor> &initial_guesses) {
+int Fractal::newton_index(VectorXd& x) {
+    auto zero = this->newtons_method(x);
+    if (this->function(zero).norm() > comparison_eps) {
+        zero << NAN, NAN;
+    }
+    for (int k = 0; k < this->zeros.size(); k++) {
+        if (zero.isApprox(this->zeros[k], (double) this->comparison_eps) || (zero.hasNaN() && this->zeros[k].hasNaN())) {
+            return k;
+        }
+    }
+    this->zeros.push_back(zero);
+    return (int) this->zeros.size() - 1;
+}
 
-    auto dimensions = initial_guesses.dimensions();
+std::vector<MatrixXd> Fractal::create_mesh(int N, double a, double b, double c, double d) {
 
-    Tensor<double, 3, RowMajor> output(dimensions[0], dimensions[1], dimensions[2]);
-    output.setZero();
+    MatrixXd x = VectorXd::LinSpaced(N, a, b).transpose().colwise().replicate(N);
+    MatrixXd y = VectorXd::LinSpaced(N, c, b).reverse().rowwise().replicate(N);
 
-    std::array<long, 3> len = {dimensions[0], 1, 1};
-    std::array<long, 1> shape = {dimensions[0]};
+    return std::vector({x, y});
+}
 
-    for (int i = 0; i < dimensions[1]; i++){
-        for (int j = 0; j < dimensions[2]; j++){
+MatrixXi Fractal::newton_grid(std::vector<MatrixXd>& mesh) {
 
+    Matrix<VectorXd, Dynamic, Dynamic> tmp(mesh[0].rows(), mesh[0].rows());
+
+    initParallel();
+
+    #pragma omp parallel for default(none) shared(mesh, tmp)
+    for (int i = 0; i < tmp.cols(); i++) {
+        {
+            for (int j = 0; j < tmp.cols(); j++) {
+                VectorXd vec(2);
+                vec << mesh[0](i, j), mesh[1](i, j);
+                tmp(i, j) = this->newtons_method(vec);
+            }
         }
     }
 
-    return output;
+
+    // Cannot multithread this because of the race condition for the zeros attribute.
+
+    MatrixXi out(tmp.rows(), tmp.cols());
+    out.setZero();
+
+    for (int i = 0; i < tmp.cols(); i++) {
+        for (int j = 0; j < tmp.cols(); j++) {
+            out(i, j) = this->newton_index(tmp(i, j));
+        }
+    }
+
+    return out;
 }

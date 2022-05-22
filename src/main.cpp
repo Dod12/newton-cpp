@@ -1,78 +1,99 @@
 #include <iostream>
 #include "Fractal.h"
 #include <Eigen/Eigen>
-#include <unsupported/Eigen/CXX11/Tensor>
-#include <pybind11/embed.h>
-#include <pybind11/eigen.h>
-#include <pybind11/numpy.h>
-#include <cmath>
-
-namespace py = pybind11;
+#include <cstdlib>
 
 
 VectorXd function(VectorXd &x) {
-    double f1 = pow(x(0),3) - 3*x(0)*pow(x(1),2) - 1;
-    double f2 = 3*pow(x(0),2)*x(1) - pow(x(1),3);
+    double f1 = pow(x(0), 3) - 3 * x(0) * pow(x(1), 2) - 1;
+    double f2 = 3 * pow(x(0), 2) * x(1) - pow(x(1), 3);
     return Vector2d(f1, f2);
 }
 
 MatrixXd jacobian(VectorXd &x) {
-    double f1x1 = 3*pow(x(0),2) - 3*pow(x(1),2);
-    double f1x2 = -6*x(0)*x(1);
-    double f2x1 = 6*x(0)*x(1);
-    double f2x2 = 3*pow(x(0),2) - 3*pow(x(1),2);
-    return Matrix2d {{f1x1, f1x2}, {f2x1, f2x2}};
+    double f1x1 = 3 * pow(x(0), 2) - 3 * pow(x(1), 2);
+    double f1x2 = -6 * x(0) * x(1);
+    double f2x1 = 6 * x(0) * x(1);
+    double f2x2 = 3 * pow(x(0), 2) - 3 * pow(x(1), 2);
+    return Matrix2d{{f1x1, f1x2},
+                    {f2x1, f2x2}};
 }
 
-Eigen::Tensor<double, 3, Eigen::RowMajor> getTensor(
-        const pybind11::array_t<double>& inArray) {
-    // request a buffer descriptor from Python
-    pybind11::buffer_info buffer_info = inArray.request();
+void print_mesh(Matrix<VectorXd, Dynamic, Dynamic>& result) {
+    MatrixXd res1(result.rows(), result.cols()), res2(result.rows(), result.cols());
+    res1.setZero();
+    res2.setZero();
 
-    // extract data an shape of input array
-    auto *data = static_cast<double *>(buffer_info.ptr);
-    std::vector<ssize_t> shape = buffer_info.shape;
+    for (int i = 0; i < res1.rows(); i++) {
+        for (int j = 0; j < res1.cols(); j++) {
+            double x_i = result(i, j)(0);
+            double y_j = result(i, j)(1);
+            res1(i, j) = x_i;
+            res2(i, j) = y_j;
+        }
+    }
 
-    // wrap ndarray in Eigen::Map:
-    // the second template argument is the rank of the tensor and has to be
-    // known at compile time
-    Eigen::TensorMap<Eigen::Tensor<double, 3, Eigen::RowMajor>> in_tensor(
-            data, shape[0], shape[1], shape[2]);
-    return in_tensor;
+    std::cout << "X1:\n" << res1 << std::endl;
+    std::cout << "X2:\n" << res2 << std::endl;
 }
 
-/*
-Matrix<Vector<double, Dynamic>, Dynamic, Dynamic> getMatrix(
-        const py::array& inArray) {
+int main(int argc, char *argv[]) {
 
-    Matrix<Vector<double, Dynamic>, Dynamic, Dynamic> out;
-    out.setZero();
+    // Set defaults
+    int N = 100;
+    double a = -1;
+    double b =  1;
+    double c = -1;
+    double d =  1;
 
-    std::vector<long> dims = inArray.request().shape;
+    for (int i = 0; i < argc; i++) {
+        if (strcmp(*(argv + i), "-n") == 0) {
+            std::cout << "N: " << *(argv + i + 1) << std::endl;
+            N = (int) strtol(*(argv + i + 1), nullptr, 0);
+        } else if (strcmp(*(argv + i), "-a") == 0) {
+            std::cout << "a: " << *(argv + i + 1) << std::endl;
+            a = (int) strtod(*(argv + i + 1), nullptr);
+        } else if (strcmp(*(argv + i), "-b") == 0) {
+            std::cout << "b: " << *(argv + i + 1) << std::endl;
+            b = (int) strtod(*(argv + i + 1), nullptr);
+        } else if (strcmp(*(argv + i), "-c") == 0) {
+            std::cout << "c: " << *(argv + i + 1) << std::endl;
+            c = (int) strtod(*(argv + i + 1), nullptr);
+        } else if (strcmp(*(argv + i), "-d") == 0) {
+            std::cout << "d: " << *(argv + i + 1) << std::endl;
+            d = (int) strtod(*(argv + i + 1), nullptr);
+        } else {
 
-    for (int i = 0; i < dims[1]; i++) {
-        for (int j = 0; j < dims[2]; j++) {
-            out(i, j) = VectorXd(inArray);
         }
     }
 
 
-    return out;
+    auto start = std::chrono::steady_clock::now();
+
+    auto result = Fractal::create_mesh(N, a, b, c, d);
+
+    auto stop = std::chrono::steady_clock::now();
+
+    auto diff = stop - start;
+
+    std::cout << "Initialization time: " << std::chrono::duration <double, std::milli> (diff).count() << " ms" << std::endl;
+
+    start = std::chrono::steady_clock::now();
+
+    Fractal fractal = Fractal(&function, &jacobian);
+    auto res = fractal.newton_grid(result);
+
+    stop = std::chrono::steady_clock::now();
+
+    diff = stop - start;
+
+    std::cout << "Execution time: " << std::chrono::duration <double> (diff).count() << " s" << std::endl;
+
+    return 0;
 }
-*/
 
-int main() {
-
-
-    /*
-    py::scoped_interpreter guard{};
-
-    py::function setup_mesh = py::module_::import("src").attr("setup_mesh");
-
-    py::tuple mesh = setup_mesh(100, -1, 1, -1, 1);
-
-    //MatrixXd mesh1 = (py::array) mesh[0];
-
-    std::cout << "Mesh: " << (std::string) repr(mesh) << std::endl;
-    */
+MatrixXi newton_grid(int N, double a, double b, double c, double d) {
+    Fractal fractal = Fractal(&function, &jacobian);
+    auto mesh = Fractal::create_mesh(N, a, b, c, d);
+    return fractal.newton_grid(mesh);
 }
