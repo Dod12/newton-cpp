@@ -40,7 +40,7 @@ void print_mesh(Matrix<VectorXd, Dynamic, Dynamic>& result) {
 int main(int argc, char *argv[]) {
 
     // Set defaults
-    int N = 100;
+    int N = 1000;
     double a = -1;
     double b =  1;
     double c = -1;

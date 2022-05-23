@@ -23,7 +23,7 @@ find_package(pybind11 2.9.2 REQUIRED CONFIG)
 
 include_directories("/usr/local/include")
 
-pybind11_add_module(py_newton src/py_newton.cpp src/Fractal.cpp src/Fractal.h src/tqdm/tqdm.h src/tqdm/utils.h)
+pybind11_add_module(py_newton src/py_newton.cpp src/Fractal.cpp src/Fractal.h)
 
 target_link_libraries(py_newton PRIVATE Eigen3::Eigen)
 
