@@ -4,22 +4,21 @@
 #include <cstdlib>
 
 
-VectorXd function(VectorXd &x) {
-    double f1 = pow(x(0), 3) - 3 * x(0) * pow(x(1), 2) - 1;
-    double f2 = 3 * pow(x(0), 2) * x(1) - pow(x(1), 3);
-    return Vector2d(f1, f2);
+Vector2d function(Vector2d &x, Vector2d &out) {
+    out(0) = pow(x(0), 3) - 3 * x(0) * pow(x(1), 2) - 1;
+    out(1) = 3 * pow(x(0), 2) * x(1) - pow(x(1), 3);
+    return out;
 }
 
-MatrixXd jacobian(VectorXd &x) {
-    double f1x1 = 3 * pow(x(0), 2) - 3 * pow(x(1), 2);
-    double f1x2 = -6 * x(0) * x(1);
-    double f2x1 = 6 * x(0) * x(1);
-    double f2x2 = 3 * pow(x(0), 2) - 3 * pow(x(1), 2);
-    return Matrix2d{{f1x1, f1x2},
-                    {f2x1, f2x2}};
+Matrix2d jacobian(Vector2d &x, Matrix2d& out) {
+    out(0,0) = 3 * pow(x(0), 2) - 3 * pow(x(1), 2);
+    out(0,1) = -6 * x(0) * x(1);
+    out(1, 0) = 6 * x(0) * x(1);
+    out(1,1) = 3 * pow(x(0), 2) - 3 * pow(x(1), 2);
+    return out;
 }
 
-void print_mesh(Matrix<VectorXd, Dynamic, Dynamic>& result) {
+void print_mesh(Matrix<Vector2d, Dynamic, Dynamic>& result) {
     MatrixXd res1(result.rows(), result.cols()), res2(result.rows(), result.cols());
     res1.setZero();
     res2.setZero();
@@ -87,7 +86,7 @@ int main(int argc, char *argv[]) {
 
     diff = stop - start;
 
-    std::cout << "Execution time: " << std::chrono::duration <double> (diff).count() << " s" << std::endl;
+    std::cout << "\nExecution time: " << std::chrono::duration <double> (diff).count() << " s" << std::endl;
 
     return 0;
 }

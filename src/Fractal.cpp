@@ -3,72 +3,80 @@
 //
 
 #include "Fractal.h"
+#include "../extern/progressbar.hpp"
 #include <Eigen/Eigen>
 #include <iostream>
 
-MatrixXd Fractal::estimate_jacobian(const VectorXd& x_0) {
 
-    // We can estimate the jacobian by using finite differences
-    long x_size = x_0.size();
+Vector2d Fractal::newtons_method(Vector2d x) {
 
-    // Create jacobian of correct size
-    MatrixXd j = MatrixXd::Zero(x_size, x_size);
-
-    for (int i = 0; i < x_size; i++){
-        VectorXd h_vec = VectorXd::Zero(x_size);
-        h_vec(i) = (double) this->h;
-        VectorXd tmp = x_0 + h_vec;
-        j(all, i) = this->function(tmp);
-    }
-
-    return j;
-}
-
-VectorXd Fractal::newtons_method(VectorXd x) {
-
-    MatrixXd j;
     int i = 0;
+    // Preallocate memory for outputs from functions
+    Matrix2d j_n(x.size(), x.size());
+    Vector2d f_n(x.size());
 
-    while (this->estimation_eps < this->function(x).norm() && i < this->max_iter) {
-        if (this->hasJacobian) {
-            j = this->jacobian(x);
-        } else {
-            j = estimate_jacobian(x);
+    if (this->hasJacobian) {
+        this->function(x, f_n);
+        while (this->estimation_eps < f_n.norm() && i < this->max_iter) {
+            this->jacobian(x, j_n);
+            if (j_n.determinant() == 0) {
+                break;
+            }
+            x = x - j_n.inverse() * f_n;
+            this->function(x, f_n);
         }
-        if (j.determinant() == 0) {
-            break;
+    } else {
+        Vector2d x_tmp(x.size());
+        this->function(x, f_n);
+        while (this->estimation_eps < f_n.norm() && i < this->max_iter) {
+            Vector2d tmp1 = x+this->h1;
+            Vector2d tmp2 = x+this->h2;
+            // Build determinant from finite differences
+            this->function(tmp1, x_tmp);
+            j_n(all, 0) = x_tmp;
+            this->function(tmp2, x_tmp);
+            j_n(all, 1) = x_tmp;
+
+            if (j_n.determinant() == 0) {
+                break;
+            }
+            x = x - j_n.inverse() * f_n;
+            this->function(x, f_n);
         }
-        x = x - j.inverse() * this->function(x);
     }
+
+    if (f_n.norm() > comparison_eps) {
+        x << NAN, NAN;
+    }
+
     return x;
 }
 
-Fractal::Fractal(VectorXd (*function)(VectorXd &), long double h, uint max_iter,
+Fractal::Fractal(Vector2d (*function)(Vector2d &, Vector2d &), long double h, uint max_iter,
                  long double comparison_eps, long double estimation_eps) {
     this->comparison_eps = comparison_eps;
     this->estimation_eps = estimation_eps;
-    this->h = h;
+    this->h1 = Vector2d {h, 0};
+    this->h2 = Vector2d {0, h};
     this->max_iter = max_iter;
     this->function = function;
     this->hasJacobian = false;
 }
 
-Fractal::Fractal(VectorXd (*function)(VectorXd &), MatrixXd (*jacobian)(VectorXd &), long double h,
+Fractal::Fractal(Vector2d (*function)(Vector2d &, Vector2d &), Matrix2d (*jacobian)(Vector2d &, Matrix2d &), long double h,
                  uint max_iter, long double comparison_eps, long double estimation_eps) {
     this->comparison_eps = comparison_eps;
     this->estimation_eps = estimation_eps;
-    this->h = h;
+    this->h1 = Vector2d {h, 0};
+    this->h2 = Vector2d {0, h};
     this->max_iter = max_iter;
     this->function = function;
     this->jacobian = jacobian;
     this->hasJacobian = true;
 }
 
-int Fractal::newton_index(VectorXd& x) {
+int Fractal::newton_index(Vector2d& x) {
     auto zero = this->newtons_method(x);
-    if (this->function(zero).norm() > comparison_eps) {
-        zero << NAN, NAN;
-    }
     for (int k = 0; k < this->zeros.size(); k++) {
         if (zero.isApprox(this->zeros[k], (double) this->comparison_eps) || (zero.hasNaN() && this->zeros[k].hasNaN())) {
             return k;
@@ -88,18 +96,22 @@ std::vector<MatrixXd> Fractal::create_mesh(int N, double a, double b, double c, 
 
 MatrixXi Fractal::newton_grid(std::vector<MatrixXd>& mesh) {
 
-    Matrix<VectorXd, Dynamic, Dynamic> tmp(mesh[0].rows(), mesh[0].rows());
+    Matrix<Vector2d, Dynamic, Dynamic> tmp(mesh[0].rows(), mesh[0].rows());
 
     initParallel();
 
-    #pragma omp parallel for default(none) shared(mesh, tmp)
+    progressbar bar((int) tmp.cols());
+
+    #pragma omp parallel for default(none) shared(mesh, tmp, bar)
     for (int i = 0; i < tmp.cols(); i++) {
         {
-            for (int j = 0; j < tmp.cols(); j++) {
-                VectorXd vec(2);
+            for (int j = 0; j < tmp.rows(); j++) {
+                Vector2d vec(2);
                 vec << mesh[0](i, j), mesh[1](i, j);
                 tmp(i, j) = this->newtons_method(vec);
             }
+            #pragma omp critical
+            bar.update();
         }
     }
 
