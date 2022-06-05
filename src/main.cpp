@@ -1,3 +1,9 @@
+//
+// Created by Daniel Carlström Schad on 2022-05-21.
+//
+
+#define EIGEN_USE_MKL_ALL
+
 #include <iostream>
 #include "Fractal.h"
 #include <Eigen/Eigen>
@@ -39,7 +45,7 @@ void print_mesh(Matrix<Vector2d, Dynamic, Dynamic>& result) {
 int main(int argc, char *argv[]) {
 
     // Set defaults
-    int N = 1000;
+    int N = 10000;
     double a = -1;
     double b =  1;
     double c = -1;

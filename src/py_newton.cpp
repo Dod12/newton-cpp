@@ -2,7 +2,7 @@
 // Created by Daniel Carlström Schad on 2022-05-21.
 //
 
-//EIGEN_USE_MKL_ALL = true
+#define EIGEN_USE_MKL_ALL
 
 #include <iostream>
 #include "Fractal.h"

@@ -89,7 +89,7 @@ int Fractal::newton_index(Vector2d& x) {
 std::vector<MatrixXd> Fractal::create_mesh(int N, double a, double b, double c, double d) {
 
     MatrixXd x = VectorXd::LinSpaced(N, a, b).transpose().colwise().replicate(N);
-    MatrixXd y = VectorXd::LinSpaced(N, c, b).reverse().rowwise().replicate(N);
+    MatrixXd y = VectorXd::LinSpaced(N, c, d).reverse().rowwise().replicate(N);
 
     return std::vector({x, y});
 }
